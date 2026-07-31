@@ -148,6 +148,7 @@ export default function DashboardPage() {
         if (plan.proteinGrams) setProteinTarget(plan.proteinGrams);
         if (plan.carbsGrams) setCarbsTarget(plan.carbsGrams);
         if (plan.fatGrams) setFatTarget(plan.fatGrams);
+        if (plan.weight) setCurrentWeight(plan.weight);
       } else {
         router.push("/onboarding");
       }

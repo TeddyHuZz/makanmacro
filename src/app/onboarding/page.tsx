@@ -156,8 +156,10 @@ export default function OnboardingPage() {
 
   const handleFinishOnboarding = () => {
     if (calculatedPlan) {
+      const userWeight = parseFloat(weightInput) || 70;
       const userPlanData = {
         ...calculatedPlan,
+        weight: userWeight,
         gender,
         goal,
         activity,
@@ -166,6 +168,12 @@ export default function OnboardingPage() {
 
       try {
         localStorage.setItem("makanmacro_user_plan", JSON.stringify(userPlanData));
+
+        // Save initial weight log entry
+        const logsStr = localStorage.getItem("makanmacro_weight_logs") || "[]";
+        const logs = JSON.parse(logsStr);
+        logs.push({ date: new Date().toISOString(), weight: userWeight });
+        localStorage.setItem("makanmacro_weight_logs", JSON.stringify(logs));
       } catch (e) {
         console.error("Failed to save plan to localStorage", e);
       }
