@@ -15,6 +15,7 @@ import {
   Award,
   Calendar,
   Sparkles,
+  Download,
 } from "lucide-react";
 
 interface MealLog {
@@ -75,6 +76,36 @@ export default function AnalyticsPage() {
       console.error("Failed to load analytics data", e);
     }
   }, [status, router]);
+
+  const handleExportCSV = () => {
+    try {
+      const savedMeals = localStorage.getItem("makanmacro_meals") || "[]";
+      const savedWeights = localStorage.getItem("makanmacro_weight_logs") || "[]";
+      const mealsData = JSON.parse(savedMeals);
+      const weightsData = JSON.parse(savedWeights);
+
+      let csvContent = "data:text/csv;charset=utf-8,Type,Date/Time,Name/Weight,Calories,Protein(g),Carbs(g),Fat(g)\n";
+
+      mealsData.forEach((m: any) => {
+        csvContent += `Meal,"${m.time || ''}","${m.name || ''}",${m.calories || 0},${m.protein || 0},${m.carbs || 0},${m.fat || 0}\n`;
+      });
+
+      weightsData.forEach((w: any) => {
+        csvContent += `WeightLog,"${w.date || ''}",${w.weight} kg,0,0,0,0\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `makanmacro_logs_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to generate CSV export.");
+    }
+  };
 
   if (status === "loading") {
     return (
@@ -156,9 +187,20 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold" title="Calorie Target Adherence Score">
-            <Award className="w-3.5 h-3.5" />
-            <span>{adherenceScore}% Target Match</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportCSV}
+              className="px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              title="Export meal & weight history as CSV"
+            >
+              <Download className="w-3.5 h-3.5 text-purple-400" />
+              <span>Export CSV</span>
+            </button>
+
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold" title="Calorie Target Adherence Score">
+              <Award className="w-3.5 h-3.5" />
+              <span>{adherenceScore}% Target Match</span>
+            </div>
           </div>
         </div>
       </header>

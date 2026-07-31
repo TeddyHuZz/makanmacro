@@ -23,6 +23,9 @@ import {
   RefreshCw,
   Scale,
   Search,
+  Share2,
+  Copy,
+  Download,
 } from "lucide-react";
 
 interface MealLog {
@@ -73,6 +76,32 @@ export default function DashboardPage() {
   const [customC, setCustomC] = useState("");
   const [customF, setCustomF] = useState("");
 
+  // Social Share Story Modal state
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
+  // Photo Source Action Sheet state
+  const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false);
+
+  // Photo Analysis Modal state
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string>("");
+  const [portionMultiplier, setPortionMultiplier] = useState<number>(1.0);
+  const [cookingStyleMultiplier, setCookingStyleMultiplier] = useState<number>(1.0);
+  const [analyzedResult, setAnalyzedResult] = useState<{
+    name: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    emoji: string;
+  } | null>(null);
+
+  // Hidden File Input Refs
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const cloudInputRef = useRef<HTMLInputElement>(null);
+
   // Live AI + Open Food Facts DB Text Search effect
   useEffect(() => {
     if (!quickQuery || quickQuery.trim().length < 2) {
@@ -103,27 +132,6 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   }, [quickQuery]);
 
-  // Photo Source Action Sheet state
-  const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false);
-
-  // Photo Analysis Modal state
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string>("");
-  const [portionMultiplier, setPortionMultiplier] = useState<number>(1.0);
-  const [analyzedResult, setAnalyzedResult] = useState<{
-    name: string;
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-    emoji: string;
-  } | null>(null);
-
-  // Hidden File Input Refs
-  const cameraInputRef = useRef<HTMLInputElement>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
-  const cloudInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -273,15 +281,18 @@ export default function DashboardPage() {
   const handleConfirmAddMeal = () => {
     if (!analyzedResult) return;
 
+    const mult = portionMultiplier * cookingStyleMultiplier;
+    const styleSuffix = cookingStyleMultiplier === 0.85 ? " (Less Oil)" : cookingStyleMultiplier === 1.15 ? " (Extra Oil/Gravy)" : "";
+
     const newMeal: MealLog = {
       id: Date.now().toString(),
-      name: analyzedResult.name,
+      name: analyzedResult.name + styleSuffix,
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       type: "Meal Scan",
-      calories: analyzedResult.calories,
-      protein: analyzedResult.protein,
-      carbs: analyzedResult.carbs,
-      fat: analyzedResult.fat,
+      calories: Math.round(analyzedResult.calories * mult),
+      protein: Math.round(analyzedResult.protein * mult),
+      carbs: Math.round(analyzedResult.carbs * mult),
+      fat: Math.round(analyzedResult.fat * mult),
       emoji: analyzedResult.emoji,
       imageUrl: selectedImage || undefined,
     };
@@ -289,6 +300,8 @@ export default function DashboardPage() {
     saveMealsToStorage([...meals, newMeal]);
     setSelectedImage(null);
     setAnalyzedResult(null);
+    setPortionMultiplier(1.0);
+    setCookingStyleMultiplier(1.0);
   };
 
   const handleDeleteMeal = (id: string) => {
@@ -1068,7 +1081,7 @@ export default function DashboardPage() {
                       </span>
                     </span>
                     <span className="font-extrabold text-white">
-                      {Math.round(analyzedResult.calories * portionMultiplier)} kcal
+                      {Math.round(analyzedResult.calories * portionMultiplier * cookingStyleMultiplier)} kcal
                     </span>
                   </div>
                 </div>
@@ -1096,24 +1109,84 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Calculated Macros based on portion */}
+                {/* Hawker Preparation Style Adjuster (Human-Grade UI/UX) */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[10px] uppercase font-bold tracking-wider text-zinc-400">
+                      Hawker Preparation & Oil Style
+                    </label>
+                    <span className="text-[10px] font-semibold text-emerald-400">
+                      {cookingStyleMultiplier === 0.85 ? "-15% Oil Cut" : cookingStyleMultiplier === 1.15 ? "+15% Extra Gravy" : "Standard Hawker"}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      {
+                        id: "less-oil",
+                        label: "Less Oil",
+                        sub: "Kurang Minyak",
+                        val: 0.85,
+                        icon: Droplet,
+                        activeStyle: "bg-emerald-500/15 border-emerald-500 text-emerald-400 shadow-lg shadow-emerald-500/10",
+                      },
+                      {
+                        id: "biasa",
+                        label: "Biasa",
+                        sub: "Standard Stall",
+                        val: 1.0,
+                        icon: Utensils,
+                        activeStyle: "bg-zinc-800 border-zinc-600 text-white shadow-lg",
+                      },
+                      {
+                        id: "extra-gravy",
+                        label: "Extra Gravy",
+                        sub: "Tambah Sambal",
+                        val: 1.15,
+                        icon: Flame,
+                        activeStyle: "bg-rose-500/15 border-rose-500 text-rose-400 shadow-lg shadow-rose-500/10",
+                      },
+                    ].map((prep) => {
+                      const IconComp = prep.icon;
+                      const isSelected = cookingStyleMultiplier === prep.val;
+                      return (
+                        <button
+                          key={prep.id}
+                          type="button"
+                          onClick={() => setCookingStyleMultiplier(prep.val)}
+                          className={`py-2 px-2 rounded-2xl border flex flex-col items-center justify-center text-center transition-all duration-200 active:scale-95 ${
+                            isSelected
+                              ? prep.activeStyle
+                              : "bg-zinc-950/80 border-zinc-800/80 text-zinc-400 hover:border-zinc-700 hover:text-zinc-300"
+                          }`}
+                        >
+                          <IconComp className={`w-3.5 h-3.5 mb-1 ${isSelected ? "" : "opacity-60"}`} />
+                          <span className="text-xs font-bold block leading-tight">{prep.label}</span>
+                          <span className="text-[9px] text-zinc-400 font-medium mt-0.5">{prep.sub}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Calculated Macros based on portion & style */}
                 <div className="grid grid-cols-3 gap-2 text-center">
                   <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800">
                     <span className="text-[10px] text-zinc-400 font-medium">Protein</span>
                     <p className="text-xs font-bold text-white">
-                      {Math.round(analyzedResult.protein * portionMultiplier)}g
+                      {Math.round(analyzedResult.protein * portionMultiplier * cookingStyleMultiplier)}g
                     </p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800">
                     <span className="text-[10px] text-zinc-400 font-medium">Carbs</span>
                     <p className="text-xs font-bold text-white">
-                      {Math.round(analyzedResult.carbs * portionMultiplier)}g
+                      {Math.round(analyzedResult.carbs * portionMultiplier * cookingStyleMultiplier)}g
                     </p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-zinc-950 border border-zinc-800">
                     <span className="text-[10px] text-zinc-400 font-medium">Fat</span>
                     <p className="text-xs font-bold text-white">
-                      {Math.round(analyzedResult.fat * portionMultiplier)}g
+                      {Math.round(analyzedResult.fat * portionMultiplier * cookingStyleMultiplier)}g
                     </p>
                   </div>
                 </div>
@@ -1145,6 +1218,90 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* SOCIAL SHARE DAILY RECAP STORY MODAL */}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-zinc-950 border border-zinc-800 rounded-3xl p-6 space-y-5 shadow-2xl relative overflow-hidden">
+            {/* Top Bar */}
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-white">Daily Macro Recap</h3>
+                  <p className="text-[10px] text-zinc-400">{new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}</p>
+                </div>
+              </div>
+              <button onClick={() => setIsShareModalOpen(false)} className="text-zinc-400 hover:text-white p-1">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Main Story Card Preview */}
+            <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-4 shadow-xl">
+              {/* Calorie Stats */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Total Consumed</span>
+                  <p className="text-xl font-black text-white">{totalCalories} <span className="text-xs font-normal text-zinc-400">/ {targetCalories} kcal</span></p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-extrabold text-xs">
+                  {Math.round(progressPercent)}%
+                </div>
+              </div>
+
+              {/* Macro Pills */}
+              <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+                <div className="p-2 rounded-xl bg-zinc-950 border border-zinc-800">
+                  <p className="text-emerald-400 font-bold">{totalProtein}g</p>
+                  <p className="text-zinc-400 font-medium">Protein</p>
+                </div>
+                <div className="p-2 rounded-xl bg-zinc-950 border border-zinc-800">
+                  <p className="text-amber-400 font-bold">{totalCarbs}g</p>
+                  <p className="text-zinc-400 font-medium">Carbs</p>
+                </div>
+                <div className="p-2 rounded-xl bg-zinc-950 border border-zinc-800">
+                  <p className="text-sky-400 font-bold">{totalFat}g</p>
+                  <p className="text-zinc-400 font-medium">Fat</p>
+                </div>
+              </div>
+
+              {/* Today's Meals Quick List */}
+              <div className="space-y-1.5 pt-1">
+                <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Log Highlights</span>
+                {meals.slice(0, 3).map((m) => (
+                  <div key={m.id} className="flex items-center justify-between text-xs p-2 rounded-xl bg-zinc-950 border border-zinc-800/60">
+                    <span className="text-zinc-200 font-medium truncate max-w-45">{m.emoji} {m.name}</span>
+                    <span className="text-emerald-400 font-bold">{m.calories} kcal</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* MakanMacro AI Watermark */}
+              <div className="pt-2 flex items-center justify-between text-[9px] text-zinc-500 border-t border-zinc-800/60">
+                <span className="font-semibold text-zinc-400">MakanMacro Asian AI Tracker</span>
+                <span>makanmacro.com</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const summaryText = `🔥 My MakanMacro Recap (${new Date().toLocaleDateString()})\n\nTotal Calories: ${totalCalories} / ${targetCalories} kcal\n🥩 Protein: ${totalProtein}g\n🌾 Carbs: ${totalCarbs}g\n🥑 Fat: ${totalFat}g\n\nMeals Logged:\n${meals.map(m => `• ${m.emoji} ${m.name} (${m.calories} kcal)`).join("\n")}\n\nTracked with MakanMacro AI!`;
+                  navigator.clipboard.writeText(summaryText);
+                  alert("🎉 Daily Macro Summary copied to clipboard! Ready to paste on WhatsApp / Instagram Story.");
+                }}
+                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors shadow-lg shadow-purple-600/20"
+              >
+                <Copy className="w-4 h-4" />
+                <span>Copy Summary Text</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
