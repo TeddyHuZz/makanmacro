@@ -158,20 +158,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="hidden lg:flex flex-col space-y-2.5 text-xs text-zinc-400 pt-1">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                <Check className="w-3 h-3" />
-              </div>
-              <span>No manual searching — AI vision detects local hawker dishes</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                <Check className="w-3 h-3" />
-              </div>
-              <span>PWA supported — install directly on iOS & Android home screens</span>
-            </div>
-          </div>
         </div>
 
         {/* Right Side Form (Mobile-first responsive card, enlarged & desktop friendly) */}
@@ -369,10 +355,19 @@ export default function LoginPage() {
       </div>
 
       {/* Footer */}
-      <footer className="w-full text-center py-6">
-        <p className="text-xs text-zinc-600">
-          MakanMacro
+      <footer className="w-full text-center py-6 space-y-1">
+        <p className="text-xs text-zinc-500 font-medium">
+          MakanMacro AI Asian Nutrition Tracker
         </p>
+        <div className="flex items-center justify-center gap-4 text-xs text-zinc-600">
+          <button onClick={() => router.push("/terms")} className="hover:text-emerald-400 transition-colors">
+            Terms of Service
+          </button>
+          <span>•</span>
+          <button onClick={() => router.push("/privacy")} className="hover:text-emerald-400 transition-colors">
+            Privacy Policy
+          </button>
+        </div>
       </footer>
     </div>
   );

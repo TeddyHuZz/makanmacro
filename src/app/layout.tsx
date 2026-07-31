@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MakanMacro - AI Food & Macro Tracker (Asian & Malaysian)",
+  title: "MakanMacro",
   description:
     "Snap a photo of your meal and instantly get calorie & macro analysis tailored for Nasi Lemak, Roti Canai, Laksa & Asian dishes.",
   manifest: "/manifest.json",
