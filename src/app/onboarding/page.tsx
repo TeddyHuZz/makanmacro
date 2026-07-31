@@ -207,9 +207,12 @@ export default function OnboardingPage() {
       {/* Top Header */}
       <header className="w-full max-w-md pt-4 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-500">
-            <Camera className="w-5 h-5 stroke-2" />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo.png"
+            alt="MakanMacro Logo"
+            className="w-9 h-9 rounded-xl object-cover border border-emerald-500/30 shadow-md shadow-emerald-500/10"
+          />
           <span className="text-lg font-extrabold text-white tracking-tight">
             Makan<span className="text-emerald-500">Macro</span>
           </span>

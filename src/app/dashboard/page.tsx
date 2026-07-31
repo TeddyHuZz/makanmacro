@@ -342,29 +342,24 @@ export default function DashboardPage() {
       {/* Top Header Navigation */}
       <header className="sticky top-0 z-20 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-800 px-4 sm:px-8 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center overflow-hidden shrink-0">
-            {user?.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={user.image}
-                alt={user.name || "User Avatar"}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span className="text-xs font-bold text-zinc-300">
-                {user?.name?.[0]?.toUpperCase() || "M"}
-              </span>
-            )}
+          <div className="relative shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="MakanMacro Logo"
+              className="w-10 h-10 rounded-xl object-cover border border-emerald-500/30 shadow-md shadow-emerald-500/10"
+            />
           </div>
           <div>
-            <h2 className="text-sm font-bold leading-tight text-white">
-              {user?.name || "Member"}
+            <h2 className="text-sm font-extrabold leading-tight text-white flex items-center gap-1.5">
+              <span>MakanMacro</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">AI</span>
             </h2>
             <button
               onClick={() => router.push("/onboarding")}
-              className="text-[11px] text-emerald-400 hover:underline font-medium"
+              className="text-[11px] text-zinc-400 hover:text-emerald-400 transition-colors font-medium block truncate"
             >
-              TDEE Plan: {targetCalories.toLocaleString()} kcal (Edit)
+              Target: {targetCalories.toLocaleString()} kcal (Edit)
             </button>
           </div>
         </div>

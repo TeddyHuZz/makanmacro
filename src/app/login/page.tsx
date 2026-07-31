@@ -102,9 +102,12 @@ export default function LoginPage() {
         {/* Left Side Showcase (Visible on Laptop / Desktop screens, concise on mobile) */}
         <div className="lg:col-span-6 flex flex-col justify-center space-y-6 lg:pr-6">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-500 shadow-md">
-              <Camera className="w-6 h-6 stroke-[2.2]" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="MakanMacro Logo"
+              className="w-12 h-12 rounded-2xl object-cover border border-emerald-500/30 shadow-lg shadow-emerald-500/10"
+            />
             <div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
                 Makan<span className="text-emerald-500">Macro</span>

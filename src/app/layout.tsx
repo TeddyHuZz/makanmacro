@@ -18,9 +18,14 @@ export const metadata: Metadata = {
   description:
     "Snap a photo of your meal and instantly get calorie & macro analysis tailored for Nasi Lemak, Roti Canai, Laksa & Asian dishes.",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icon.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "MakanMacro",
   },
 };

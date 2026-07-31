@@ -174,18 +174,11 @@ export default function AnalyticsPage() {
         <div className="max-w-md lg:max-w-4xl mx-auto flex items-center justify-between gap-2">
           {/* Left: Back Button + Clean Title */}
           <div className="flex items-center gap-2.5 min-w-0">
-            <button
-              onClick={() => router.push("/dashboard")}
-              className="p-2 rounded-2xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-all shrink-0 active:scale-95"
-              title="Back to Dashboard"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
             <div className="min-w-0">
               <h1 className="text-sm font-extrabold text-white truncate leading-tight">
                 Analytics
               </h1>
-              <p className="text-[10px] text-zinc-400 truncate">MacroFactor Engine</p>
+              <p className="text-[10px] text-zinc-400 truncate">MakanMacro Engine</p>
             </div>
           </div>
 
