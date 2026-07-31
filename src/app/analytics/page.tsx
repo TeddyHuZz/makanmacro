@@ -169,37 +169,43 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans pb-24 selection:bg-emerald-500 selection:text-white">
-      {/* Top Mobile/Header Bar */}
-      <header className="sticky top-0 z-20 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800/80 px-4 py-3.5">
-        <div className="max-w-md lg:max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      {/* Top Mobile/Header Bar (Human-Grade UI/UX Redesign) */}
+      <header className="sticky top-0 z-20 bg-zinc-950/90 backdrop-blur-xl border-b border-zinc-800/80 px-4 py-3">
+        <div className="max-w-md lg:max-w-4xl mx-auto flex items-center justify-between gap-2">
+          {/* Left: Back Button + Clean Title */}
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
               onClick={() => router.push("/dashboard")}
-              className="p-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white transition-colors"
+              className="p-2 rounded-2xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition-all shrink-0 active:scale-95"
+              title="Back to Dashboard"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
-            <div>
-              <h1 className="text-sm font-bold text-white flex items-center gap-1.5">
-                <span>Analytics & Insights</span>
+            <div className="min-w-0">
+              <h1 className="text-sm font-extrabold text-white truncate leading-tight">
+                Analytics
               </h1>
-              <p className="text-[11px] text-zinc-400">MacroFactor Trend Engine</p>
+              <p className="text-[10px] text-zinc-400 truncate">MacroFactor Engine</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Right: Sleek Action Pills */}
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={handleExportCSV}
-              className="px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-700 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              className="px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800/80 hover:border-purple-500/40 text-zinc-300 hover:text-white text-[11px] font-bold flex items-center gap-1.5 transition-all active:scale-95 shadow-xs"
               title="Export meal & weight history as CSV"
             >
-              <Download className="w-3.5 h-3.5 text-purple-400" />
-              <span>Export CSV</span>
+              <Download className="w-3 h-3 text-purple-400" />
+              <span>CSV</span>
             </button>
 
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold" title="Calorie Target Adherence Score">
-              <Award className="w-3.5 h-3.5" />
-              <span>{adherenceScore}% Target Match</span>
+            <div
+              className="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-extrabold flex items-center gap-1 shrink-0"
+              title="Calorie Target Adherence Score"
+            >
+              <Award className="w-3 h-3" />
+              <span>{adherenceScore}% Match</span>
             </div>
           </div>
         </div>
