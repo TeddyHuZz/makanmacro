@@ -743,6 +743,35 @@ export default function DashboardPage() {
                       const logs = JSON.parse(logsStr);
                       logs.push({ date: new Date().toISOString(), weight: val });
                       localStorage.setItem("makanmacro_weight_logs", JSON.stringify(logs));
+
+                      // Automatically Recalculate TDEE & Update Daily Calorie Target
+                      if (logs.length >= 2) {
+                        const first = logs[0].weight;
+                        const last = logs[logs.length - 1].weight;
+                        const deltaKg = last - first;
+                        const avgIntake = totalCalories > 0 ? totalCalories : targetCalories;
+                        const calculatedTDEE = Math.round(avgIntake - (deltaKg * 7700 / Math.max(1, logs.length)));
+                        
+                        if (calculatedTDEE >= 1200 && calculatedTDEE <= 4500) {
+                          const newCalTarget = Math.max(1200, calculatedTDEE - 350);
+                          const newProtein = Math.round((newCalTarget * 0.3) / 4);
+                          const newCarbs = Math.round((newCalTarget * 0.45) / 4);
+                          const newFat = Math.round((newCalTarget * 0.25) / 9);
+
+                          setTargetCalories(newCalTarget);
+                          setProteinTarget(newProtein);
+                          setCarbsTarget(newCarbs);
+                          setFatTarget(newFat);
+
+                          const updatedPlan = {
+                            targetCalories: newCalTarget,
+                            proteinGrams: newProtein,
+                            carbsGrams: newCarbs,
+                            fatGrams: newFat,
+                          };
+                          localStorage.setItem("makanmacro_user_plan", JSON.stringify(updatedPlan));
+                        }
+                      }
                     } catch (e) {
                       console.error(e);
                     }
