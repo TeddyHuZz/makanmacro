@@ -33,13 +33,34 @@ export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // Dynamic clean meal log state
+  // Dynamic meal log & user plan state
   const [meals, setMeals] = useState<MealLog[]>([]);
-  const [targetCalories] = useState(2000);
+  const [targetCalories, setTargetCalories] = useState<number>(2000);
+  const [proteinTarget, setProteinTarget] = useState<number>(130);
+  const [carbsTarget, setCarbsTarget] = useState<number>(220);
+  const [fatTarget, setFatTarget] = useState<number>(65);
+  const [userGoal, setUserGoal] = useState<string>("maintain");
 
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/login");
+      return;
+    }
+
+    try {
+      const savedPlanStr = localStorage.getItem("makanmacro_user_plan");
+      if (savedPlanStr) {
+        const plan = JSON.parse(savedPlanStr);
+        if (plan.targetCalories) setTargetCalories(plan.targetCalories);
+        if (plan.proteinGrams) setProteinTarget(plan.proteinGrams);
+        if (plan.carbsGrams) setCarbsTarget(plan.carbsGrams);
+        if (plan.fatGrams) setFatTarget(plan.fatGrams);
+        if (plan.goal) setUserGoal(plan.goal);
+      } else {
+        router.push("/onboarding");
+      }
+    } catch (e) {
+      console.error("Failed to parse saved plan", e);
     }
   }, [status, router]);
 
@@ -225,7 +246,7 @@ export default function DashboardPage() {
                   <span>Protein</span>
                 </div>
                 <span className="text-xs sm:text-sm font-bold text-white">
-                  {totalProtein}g / 130g
+                  {totalProtein}g / {proteinTarget}g
                 </span>
               </div>
 
@@ -235,7 +256,7 @@ export default function DashboardPage() {
                   <span>Carbs</span>
                 </div>
                 <span className="text-xs sm:text-sm font-bold text-white">
-                  {totalCarbs}g / 220g
+                  {totalCarbs}g / {carbsTarget}g
                 </span>
               </div>
 
@@ -245,7 +266,7 @@ export default function DashboardPage() {
                   <span>Fat</span>
                 </div>
                 <span className="text-xs sm:text-sm font-bold text-white">
-                  {totalFat}g / 65g
+                  {totalFat}g / {fatTarget}g
                 </span>
               </div>
             </div>

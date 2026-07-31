@@ -74,11 +74,16 @@ export default function LoginPage() {
       } else {
         setSuccessMsg(
           mode === "signup"
-            ? "Account created! Redirecting to dashboard..."
+            ? "Account created! Setting up your TDEE plan..."
             : "Welcome back! Redirecting..."
         );
         setTimeout(() => {
-          router.push("/dashboard");
+          const existingPlan = localStorage.getItem("makanmacro_user_plan");
+          if (existingPlan) {
+            router.push("/dashboard");
+          } else {
+            router.push("/onboarding");
+          }
           router.refresh();
         }, 800);
       }
