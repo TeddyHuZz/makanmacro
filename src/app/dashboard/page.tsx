@@ -21,6 +21,8 @@ import {
   Loader2,
   Trash2,
   RefreshCw,
+  Scale,
+  Search,
 } from "lucide-react";
 
 interface MealLog {
@@ -46,6 +48,60 @@ export default function DashboardPage() {
   const [proteinTarget, setProteinTarget] = useState<number>(130);
   const [carbsTarget, setCarbsTarget] = useState<number>(220);
   const [fatTarget, setFatTarget] = useState<number>(65);
+
+  // MacroFactor Scale Weight & Trend state
+  const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
+  const [scaleWeightInput, setScaleWeightInput] = useState("");
+  const [currentWeight, setCurrentWeight] = useState<number | null>(72.5);
+
+  // Quick Search & Custom Macro Log state
+  const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
+  const [quickQuery, setQuickQuery] = useState("");
+  const [isSearchingFood, setIsSearchingFood] = useState(false);
+  const [searchResults, setSearchResults] = useState<{
+    name: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    emoji: string;
+    source: string;
+  }[]>([]);
+  const [customName, setCustomName] = useState("");
+  const [customCals, setCustomCals] = useState("");
+  const [customP, setCustomP] = useState("");
+  const [customC, setCustomC] = useState("");
+  const [customF, setCustomF] = useState("");
+
+  // Live AI + Open Food Facts DB Text Search effect
+  useEffect(() => {
+    if (!quickQuery || quickQuery.trim().length < 2) {
+      setSearchResults([]);
+      setIsSearchingFood(false);
+      return;
+    }
+
+    setIsSearchingFood(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/search-food", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: quickQuery }),
+        });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.results)) {
+          setSearchResults(data.results);
+        }
+      } catch (e) {
+        console.error("Search fetch error", e);
+      } finally {
+        setIsSearchingFood(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [quickQuery]);
 
   // Photo Source Action Sheet state
   const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false);
@@ -92,6 +148,15 @@ export default function DashboardPage() {
       const savedMealsStr = localStorage.getItem("makanmacro_meals");
       if (savedMealsStr) {
         setMeals(JSON.parse(savedMealsStr));
+      }
+
+      // Load scale weight logs
+      const savedWeightStr = localStorage.getItem("makanmacro_weight_logs");
+      if (savedWeightStr) {
+        const logs = JSON.parse(savedWeightStr);
+        if (logs.length > 0) {
+          setCurrentWeight(logs[logs.length - 1].weight);
+        }
       }
     } catch (e) {
       console.error("Failed to parse saved data", e);
@@ -293,6 +358,15 @@ export default function DashboardPage() {
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setIsWeightModalOpen(true)}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-xs font-semibold transition-colors"
+            title="Log Scale Weight"
+          >
+            <Scale className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{currentWeight ? `${currentWeight} kg` : "Log Weight"}</span>
+          </button>
+
+          <button
             onClick={() => setIsPhotoPickerOpen(true)}
             className="hidden sm:flex items-center gap-2 h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors"
           >
@@ -318,64 +392,72 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
           {/* Photo Scan Action Banner */}
           <div className="md:col-span-5 bg-zinc-900 border border-zinc-800 rounded-3xl p-6 flex flex-col justify-between">
-            <div>
-              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4">
-                <Camera className="w-5 h-5 stroke-[2.2]" />
+            <div className="space-y-2">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-3">
+                <Camera className="w-5 h-5" />
               </div>
-              <h3 className="text-lg font-extrabold text-white tracking-tight">
-                Log Food via Photo
-              </h3>
-              <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
-                Snap a picture of your meal for instant AI calorie & macro estimation.
+              <h3 className="text-base font-bold text-white">AI Vision Meal Scanner</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Snap or upload any Malaysian or Asian dish. Instantly detects calories, protein, carbs, & fat.
               </p>
             </div>
 
-            <button
-              onClick={() => setIsPhotoPickerOpen(true)}
-              className="mt-6 w-full h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors shadow-lg shadow-emerald-600/10"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Snap Meal Photo</span>
-            </button>
+            <div className="pt-4 flex flex-col gap-2">
+              <button
+                onClick={() => setIsPhotoPickerOpen(true)}
+                className="w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-lg shadow-emerald-600/20"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Snap Meal Photo</span>
+              </button>
+
+              <button
+                onClick={() => setIsQuickSearchOpen(true)}
+                className="w-full py-2.5 px-4 rounded-2xl bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 font-semibold text-xs flex items-center justify-center gap-2 transition-colors"
+              >
+                <Search className="w-3.5 h-3.5 text-amber-400" />
+                <span>Quick Search / Custom Entry</span>
+              </button>
+            </div>
           </div>
 
-          {/* Daily Calorie Summary */}
-          <div className="md:col-span-7 bg-zinc-900 border border-zinc-800 rounded-3xl p-6 space-y-5">
+          {/* Calorie & Target Progress Card */}
+          <div className="md:col-span-7 bg-zinc-900 border border-zinc-800 rounded-3xl p-6 flex flex-col justify-between space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="text-xs uppercase font-bold tracking-wider text-zinc-400">
-                  Daily Budget Progress
-                </h4>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-3xl font-extrabold text-white">
-                    {totalCalories.toLocaleString()}
-                  </span>
-                  <span className="text-sm text-zinc-400">
-                    / {targetCalories.toLocaleString()} kcal
-                  </span>
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Daily Target Budget</span>
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  <h3 className="text-2xl sm:text-3xl font-extrabold text-white">
+                    {totalCalories} <span className="text-sm font-normal text-zinc-400">/ {targetCalories} kcal</span>
+                  </h3>
                 </div>
               </div>
 
               <div className="text-right">
-                <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
-                  {remainingCalories.toLocaleString()} kcal left
-                </span>
+                <span className="text-xs font-semibold text-emerald-400 block">Remaining</span>
+                <span className="text-lg sm:text-xl font-bold text-white">{remainingCalories} kcal</span>
               </div>
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full bg-zinc-950 h-2.5 rounded-full overflow-hidden border border-zinc-800">
-              <div
-                className="bg-emerald-500 h-full rounded-full transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
-              />
+            <div className="space-y-1.5">
+              <div className="h-3 w-full rounded-full bg-zinc-950 border border-zinc-800 overflow-hidden">
+                <div
+                  style={{ width: `${progressPercent}%` }}
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                />
+              </div>
+              <div className="flex justify-between text-[11px] text-zinc-400 font-medium">
+                <span>{Math.round(progressPercent)}% Budget Used</span>
+                <span>{targetCalories - totalCalories >= 0 ? "Under Limit" : "Over Limit"}</span>
+              </div>
             </div>
 
-            {/* Macro Breakdown Cards */}
-            <div className="grid grid-cols-3 gap-3 pt-1">
+            {/* Macro Cards */}
+            <div className="grid grid-cols-3 gap-2.5 pt-1">
               <div className="p-3 rounded-2xl bg-zinc-950 border border-zinc-800/80 flex flex-col items-center">
                 <div className="flex items-center gap-1.5 text-xs text-zinc-400 mb-1 font-medium">
-                  <Drumstick className="w-3.5 h-3.5 text-rose-400" />
+                  <Drumstick className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Protein</span>
                 </div>
                 <span className="text-xs sm:text-sm font-bold text-white">
@@ -431,7 +513,7 @@ export default function DashboardPage() {
               <Utensils className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
               <p className="text-xs font-semibold text-zinc-300">No meals logged today</p>
               <p className="text-[11px] text-zinc-500 mt-0.5">
-                Tap &quot;Snap Meal Photo&quot; to choose from Camera, Gallery, or Google Photos.
+                Tap &quot;Snap Meal Photo&quot; or &quot;Quick Search&quot; to log your first meal.
               </p>
             </div>
           ) : (
@@ -439,43 +521,58 @@ export default function DashboardPage() {
               {meals.map((meal) => (
                 <div
                   key={meal.id}
-                  className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800/80 flex items-center justify-between"
+                  className="p-3.5 sm:p-4 rounded-2xl bg-zinc-950/90 border border-zinc-800/80 hover:border-zinc-700/80 transition-all duration-200 group flex flex-col gap-2.5"
                 >
-                  <div className="flex items-center gap-3">
-                    {meal.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={meal.imageUrl}
-                        alt={meal.name}
-                        className="w-10 h-10 rounded-xl object-cover border border-zinc-800"
-                      />
-                    ) : (
-                      <span className="text-2xl">{meal.emoji}</span>
-                    )}
-                    <div>
-                      <h5 className="text-xs sm:text-sm font-bold text-white">
-                        {meal.name}
-                      </h5>
-                      <p className="text-xs text-zinc-400">
-                        {meal.type} • {meal.time}
-                      </p>
+                  {/* Top Row: Thumbnail + Dish Name + Calorie Badge + Delete Button */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {meal.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={meal.imageUrl}
+                          alt={meal.name}
+                          className="w-11 h-11 rounded-xl object-cover border border-zinc-800 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-11 h-11 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-xl shrink-0">
+                          {meal.emoji || "🍛"}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <h5 className="text-xs sm:text-sm font-bold text-white truncate">
+                          {meal.name}
+                        </h5>
+                        <p className="text-[11px] text-zinc-400">
+                          {meal.type} • {meal.time}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <span className="text-xs sm:text-sm font-bold text-emerald-400">
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-extrabold text-xs">
                         {meal.calories} kcal
                       </span>
-                      <p className="text-xs text-zinc-400">
-                        P:{meal.protein}g • C:{meal.carbs}g • F:{meal.fat}g
-                      </p>
+                      <button
+                        onClick={() => handleDeleteMeal(meal.id)}
+                        className="p-1 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                        title="Delete Meal"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleDeleteMeal(meal.id)}
-                      className="text-zinc-600 hover:text-rose-400 p-1 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                  </div>
+
+                  {/* Bottom Row: Micro-Badges for Macros */}
+                  <div className="flex items-center gap-1.5 pt-1 border-t border-zinc-800/50 text-[10px] font-semibold">
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                      P: {meal.protein}g
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                      C: {meal.carbs}g
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/20 text-sky-400">
+                      F: {meal.fat}g
+                    </span>
                   </div>
                 </div>
               ))}
@@ -501,7 +598,10 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        <button className="flex flex-col items-center justify-center gap-1 text-zinc-400 hover:text-white transition-colors">
+        <button
+          onClick={() => router.push("/analytics")}
+          className="flex flex-col items-center justify-center gap-1 text-zinc-400 hover:text-white transition-colors"
+        >
           <BarChart3 className="w-5 h-5" />
           <span className="text-[10px]">Analytics</span>
         </button>
@@ -513,8 +613,8 @@ export default function DashboardPage() {
           <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-5 space-y-4 shadow-2xl animate-in slide-in-from-bottom-4 duration-200">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
               <div>
-                <h3 className="text-sm font-bold text-white">Log Food Photo</h3>
-                <p className="text-[11px] text-zinc-400">Choose photo source for AI analysis</p>
+                <h3 className="text-sm font-bold text-white">Log Food Item</h3>
+                <p className="text-[11px] text-zinc-400">Choose photo source or quick search</p>
               </div>
               <button
                 onClick={() => setIsPhotoPickerOpen(false)}
@@ -557,7 +657,7 @@ export default function DashboardPage() {
                 </div>
               </button>
 
-              {/* Option 3: Open Google Photos / Cloud */}
+              {/* Option 3: Open Google Photos */}
               <button
                 onClick={() => cloudInputRef.current?.click()}
                 className="w-full p-3.5 rounded-2xl bg-zinc-950 hover:bg-zinc-800/60 border border-zinc-800 flex items-center justify-between text-left transition-colors"
@@ -571,6 +671,297 @@ export default function DashboardPage() {
                     <p className="text-[11px] text-zinc-400">Select from Google Photos / Cloud Drive</p>
                   </div>
                 </div>
+              </button>
+
+              {/* Option 4: Quick Search / Custom Entry */}
+              <button
+                onClick={() => {
+                  setIsPhotoPickerOpen(false);
+                  setIsQuickSearchOpen(true);
+                }}
+                className="w-full p-3.5 rounded-2xl bg-zinc-950 hover:bg-zinc-800/60 border border-zinc-800 flex items-center justify-between text-left transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                    <Search className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white">4. Quick Search & Custom Log</h4>
+                    <p className="text-[11px] text-zinc-400">Search drinks, snacks, or enter macros</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LOG SCALE WEIGHT MODAL */}
+      {isWeightModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Scale className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-sm font-bold text-white">Log Scale Weight</h3>
+              </div>
+              <button onClick={() => setIsWeightModalOpen(false)} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-zinc-400">
+              MacroFactor uses daily scale entries to calculate your true TDEE energy expenditure curve.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Today&apos;s Weight (kg)</label>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="72.5"
+                value={scaleWeightInput}
+                onChange={(e) => setScaleWeightInput(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:border-emerald-500 focus:outline-none placeholder:text-zinc-600"
+              />
+            </div>
+
+            <div className="pt-2 flex gap-2">
+              <button
+                onClick={() => setIsWeightModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-300 text-xs font-semibold hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const val = parseFloat(scaleWeightInput);
+                  if (val > 0) {
+                    setCurrentWeight(val);
+                    try {
+                      const logsStr = localStorage.getItem("makanmacro_weight_logs") || "[]";
+                      const logs = JSON.parse(logsStr);
+                      logs.push({ date: new Date().toISOString(), weight: val });
+                      localStorage.setItem("makanmacro_weight_logs", JSON.stringify(logs));
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  }
+                  setIsWeightModalOpen(false);
+                  setScaleWeightInput("");
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors shadow-lg shadow-emerald-600/20"
+              >
+                Save Entry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK SEARCH & CUSTOM MACRO LOG MODAL */}
+      {isQuickSearchOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Search className="w-5 h-5 text-amber-400" />
+                <h3 className="text-sm font-bold text-white">Smart Food & Drink Search</h3>
+              </div>
+              <button onClick={() => setIsQuickSearchOpen(false)} className="text-zinc-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Real-Time Live Search Input */}
+            <div className="relative">
+              <Search className="w-4 h-4 text-zinc-500 absolute left-3 top-3" />
+              <input
+                type="text"
+                placeholder="Search food or drink (e.g., Teh C, Kopi, Roti...)"
+                value={quickQuery}
+                onChange={(e) => setQuickQuery(e.target.value)}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-xs font-semibold text-white focus:border-amber-500 focus:outline-none placeholder:text-zinc-600"
+              />
+            </div>
+
+            {/* Smart Database & Filter Results */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                <span>{quickQuery ? "Matching Results" : "Popular Presets"}</span>
+                <span className="text-amber-400 font-mono flex items-center gap-1">
+                  {isSearchingFood ? (
+                    <>
+                      <Loader2 className="w-3 h-3 text-amber-400 animate-spin" />
+                      <span>AI Searching...</span>
+                    </>
+                  ) : (
+                    <span>✨ AI + Asian DB</span>
+                  )}
+                </span>
+              </div>
+
+              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                {/* 1. Live AI & Open Food Facts Search Results */}
+                {searchResults.length > 0 && (
+                  <div className="space-y-1.5 mb-2">
+                    {searchResults.map((item, idx) => (
+                      <button
+                        key={`sr-${idx}`}
+                        onClick={() => {
+                          const newMeal: MealLog = {
+                            id: Date.now().toString(),
+                            name: item.name,
+                            time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                            type: "AI Quick Search",
+                            calories: item.calories,
+                            protein: item.protein,
+                            carbs: item.carbs,
+                            fat: item.fat,
+                            emoji: item.emoji || "🥛",
+                          };
+                          saveMealsToStorage([...meals, newMeal]);
+                          setIsQuickSearchOpen(false);
+                          setQuickQuery("");
+                          setSearchResults([]);
+                        }}
+                        className="w-full p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 flex items-center justify-between text-left transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="text-lg shrink-0">{item.emoji || "🍹"}</span>
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold text-white block truncate">{item.name}</span>
+                            <span className="text-[9px] text-amber-400 font-semibold">{item.source || "✨ AI Estimate"}</span>
+                          </div>
+                        </div>
+                        <span className="text-xs font-extrabold text-emerald-400 shrink-0 ml-2">{item.calories} kcal</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* 2. Popular Presets Filter */}
+                {[
+                  { name: "Teh O Ais (Iced Black Tea)", calories: 85, protein: 0, carbs: 21, fat: 0, emoji: "🧊" },
+                  { name: "Teh Tarik Kurang Manis", calories: 140, protein: 3, carbs: 22, fat: 4, emoji: "☕" },
+                  { name: "Kopi O Kosong", calories: 15, protein: 0, carbs: 3, fat: 0, emoji: "☕" },
+                  { name: "Teh C Peng Special", calories: 180, protein: 3, carbs: 32, fat: 5, emoji: "🧋" },
+                  { name: "Sirap Bandung Ice", calories: 190, protein: 2, carbs: 38, fat: 4, emoji: "🥤" },
+                  { name: "Milo Dinosaur", calories: 280, protein: 6, carbs: 48, fat: 8, emoji: "🥤" },
+                  { name: "Curry Puff (1 pc)", calories: 240, protein: 4, carbs: 28, fat: 12, emoji: "🥟" },
+                  { name: "Kuih Seri Muka (2 pcs)", calories: 160, protein: 2, carbs: 30, fat: 4, emoji: "🍡" },
+                  { name: "Roti Canai Kosong", calories: 300, protein: 6, carbs: 46, fat: 10, emoji: "🫓" },
+                  { name: "Soft Boiled Eggs (2 pcs)", calories: 140, protein: 12, carbs: 1, fat: 10, emoji: "🥚" },
+                  { name: "Kaya Butter Toast", calories: 280, protein: 7, carbs: 34, fat: 13, emoji: "🍞" },
+                  { name: "Fresh Sugar Cane Juice", calories: 130, protein: 0, carbs: 33, fat: 0, emoji: "🧃" },
+                  { name: "Barley Ice Drink", calories: 110, protein: 1, carbs: 26, fat: 0, emoji: "🥛" },
+                  { name: "Cendol Dessert", calories: 260, protein: 3, carbs: 42, fat: 9, emoji: "🍧" },
+                  { name: "Siew Mai Dim Sum (3 pcs)", calories: 180, protein: 11, carbs: 14, fat: 8, emoji: "🥟" },
+                ]
+                  .filter((item) => item.name.toLowerCase().includes(quickQuery.toLowerCase()))
+                  .map((item) => (
+                    <button
+                      key={item.name}
+                      onClick={() => {
+                        const newMeal: MealLog = {
+                          id: Date.now().toString(),
+                          name: item.name,
+                          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                          type: "Quick Entry",
+                          calories: item.calories,
+                          protein: item.protein,
+                          carbs: item.carbs,
+                          fat: item.fat,
+                          emoji: item.emoji,
+                        };
+                        saveMealsToStorage([...meals, newMeal]);
+                        setIsQuickSearchOpen(false);
+                        setQuickQuery("");
+                        setSearchResults([]);
+                      }}
+                      className="w-full p-2.5 rounded-xl bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 flex items-center justify-between text-left transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-lg">{item.emoji}</span>
+                        <span className="text-xs font-semibold text-white">{item.name}</span>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-400">{item.calories} kcal</span>
+                    </button>
+                  ))}
+              </div>
+            </div>
+
+            {/* Custom Macro Entry Form */}
+            <div className="pt-2 border-t border-zinc-800 space-y-3">
+              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Custom Macro Entry</span>
+
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="Food Name (e.g. Protein Shake)"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none placeholder:text-zinc-600"
+                />
+
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    placeholder="Calories (kcal)"
+                    value={customCals}
+                    onChange={(e) => setCustomCals(e.target.value)}
+                    className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none placeholder:text-zinc-600"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Protein (g)"
+                    value={customP}
+                    onChange={(e) => setCustomP(e.target.value)}
+                    className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none placeholder:text-zinc-600"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Carbs (g)"
+                    value={customC}
+                    onChange={(e) => setCustomC(e.target.value)}
+                    className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none placeholder:text-zinc-600"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Fat (g)"
+                    value={customF}
+                    onChange={(e) => setCustomF(e.target.value)}
+                    className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white focus:border-emerald-500 focus:outline-none placeholder:text-zinc-600"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (customName && customCals) {
+                    const newMeal: MealLog = {
+                      id: Date.now().toString(),
+                      name: customName,
+                      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                      type: "Custom Log",
+                      calories: parseInt(customCals) || 0,
+                      protein: parseInt(customP) || 0,
+                      carbs: parseInt(customC) || 0,
+                      fat: parseInt(customF) || 0,
+                      emoji: "📝",
+                    };
+                    saveMealsToStorage([...meals, newMeal]);
+                    setIsQuickSearchOpen(false);
+                    setCustomName("");
+                    setCustomCals("");
+                    setCustomP("");
+                    setCustomC("");
+                    setCustomF("");
+                  }
+                }}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors shadow-lg shadow-emerald-600/20"
+              >
+                Log Custom Meal
               </button>
             </div>
           </div>
