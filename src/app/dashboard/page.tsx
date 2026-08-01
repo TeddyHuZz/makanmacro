@@ -39,6 +39,8 @@ interface MealLog {
   fat: number;
   emoji: string;
   imageUrl?: string;
+  createdAt?: string;
+  date?: string;
 }
 
 export default function DashboardPage() {
@@ -195,11 +197,35 @@ export default function DashboardPage() {
 
   const user = session?.user;
 
-  // Calculate totals from meal logs
-  const totalCalories = meals.reduce((acc, m) => acc + m.calories, 0);
-  const totalProtein = meals.reduce((acc, m) => acc + m.protein, 0);
-  const totalCarbs = meals.reduce((acc, m) => acc + m.carbs, 0);
-  const totalFat = meals.reduce((acc, m) => acc + m.fat, 0);
+  // Helper to test if a meal belongs to TODAY (resets automatically every 12:00 AM midnight)
+  const isMealLoggedToday = (meal: MealLog) => {
+    let mealDate: Date;
+    if (meal.createdAt) {
+      mealDate = new Date(meal.createdAt);
+    } else if (meal.date) {
+      mealDate = new Date(meal.date);
+    } else if (meal.id && !isNaN(Number(meal.id))) {
+      mealDate = new Date(Number(meal.id));
+    } else {
+      return true; // fallback
+    }
+
+    const today = new Date();
+    return (
+      mealDate.getDate() === today.getDate() &&
+      mealDate.getMonth() === today.getMonth() &&
+      mealDate.getFullYear() === today.getFullYear()
+    );
+  };
+
+  // Filter meals strictly for TODAY's 12:00 AM to 11:59 PM window
+  const todayMeals = meals.filter(isMealLoggedToday);
+
+  // Calculate totals strictly from today's meals
+  const totalCalories = todayMeals.reduce((acc, m) => acc + m.calories, 0);
+  const totalProtein = todayMeals.reduce((acc, m) => acc + m.protein, 0);
+  const totalCarbs = todayMeals.reduce((acc, m) => acc + m.carbs, 0);
+  const totalFat = todayMeals.reduce((acc, m) => acc + m.fat, 0);
 
   const remainingCalories = Math.max(0, targetCalories - totalCalories);
   const progressPercent = Math.min(100, (totalCalories / targetCalories) * 100);
@@ -296,6 +322,7 @@ export default function DashboardPage() {
       fat: Math.round(analyzedResult.fat * mult),
       emoji: analyzedResult.emoji,
       imageUrl: selectedImage || undefined,
+      createdAt: new Date().toISOString(),
     };
 
     saveMealsToStorage([...meals, newMeal]);
@@ -310,7 +337,8 @@ export default function DashboardPage() {
   };
 
   const handleClearAllMeals = () => {
-    saveMealsToStorage([]);
+    // Clear only today's meals while preserving historical log data for Analytics
+    saveMealsToStorage(meals.filter((m) => !isMealLoggedToday(m)));
   };
 
   return (
@@ -502,22 +530,22 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <h4 className="text-sm font-bold text-white flex items-center gap-2">
               <Utensils className="w-4 h-4 text-emerald-400" />
-              <span>Today&apos;s Meals ({meals.length})</span>
+              <span>Today&apos;s Meals ({todayMeals.length})</span>
             </h4>
 
-            {meals.length > 0 && (
+            {todayMeals.length > 0 && (
               <button
                 onClick={handleClearAllMeals}
                 className="text-xs text-zinc-500 hover:text-rose-400 flex items-center gap-1 transition-colors"
-                title="Clear All Meals"
+                title="Clear Today's Meals"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Clear All</span>
+                <span>Clear Today</span>
               </button>
             )}
           </div>
 
-          {meals.length === 0 ? (
+          {todayMeals.length === 0 ? (
             <div className="py-8 text-center border border-dashed border-zinc-800 rounded-2xl">
               <Utensils className="w-8 h-8 text-zinc-600 mx-auto mb-2" />
               <p className="text-xs font-semibold text-zinc-300">No meals logged today</p>
@@ -527,7 +555,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {meals.map((meal) => (
+              {todayMeals.map((meal) => (
                 <div
                   key={meal.id}
                   className="p-3.5 sm:p-4 rounded-2xl bg-zinc-950/90 border border-zinc-800/80 hover:border-zinc-700/80 transition-all duration-200 group flex flex-col gap-2.5"
@@ -857,6 +885,7 @@ export default function DashboardPage() {
                             carbs: item.carbs,
                             fat: item.fat,
                             emoji: item.emoji || "🥛",
+                            createdAt: new Date().toISOString(),
                           };
                           saveMealsToStorage([...meals, newMeal]);
                           setIsQuickSearchOpen(false);
@@ -911,6 +940,7 @@ export default function DashboardPage() {
                           carbs: item.carbs,
                           fat: item.fat,
                           emoji: item.emoji,
+                          createdAt: new Date().toISOString(),
                         };
                         saveMealsToStorage([...meals, newMeal]);
                         setIsQuickSearchOpen(false);
@@ -987,6 +1017,7 @@ export default function DashboardPage() {
                       carbs: parseInt(customC) || 0,
                       fat: parseInt(customF) || 0,
                       emoji: "📝",
+                      createdAt: new Date().toISOString(),
                     };
                     saveMealsToStorage([...meals, newMeal]);
                     setIsQuickSearchOpen(false);
