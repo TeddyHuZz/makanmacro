@@ -72,18 +72,20 @@ export async function POST(req: Request) {
     // 2. STEP 2: SMART AI FALLBACK ONLY WHEN DB IS EMPTY
     const geminiKey = process.env.GEMINI_API_KEY?.trim();
     if (geminiKey && geminiKey.length > 5) {
-      try {
-        const geminiRes = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${geminiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `You are MakanMacro AI nutritionist specialized in Malaysian & Asian cuisine.
+      const geminiModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
+      for (const modelName of geminiModels) {
+        try {
+          const geminiRes = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: `You are MakanMacro AI nutritionist specialized in Malaysian & Asian cuisine.
 Analyze the user food search query: "${searchQuery}".
 Provide authentic Malaysian/Asian standard nutritional estimate.
 Return raw JSON format ONLY:
@@ -96,45 +98,33 @@ Return raw JSON format ONLY:
   "emoji": "🧊",
   "source": "✨ Gemini AI Smart Estimate"
 }`,
-                    },
-                  ],
+                      },
+                    ],
+                  },
+                ],
+                generationConfig: {
+                  response_mime_type: "application/json",
+                  temperature: 0.1,
                 },
-              ],
-              generationConfig: {
-                response_mime_type: "application/json",
-                temperature: 0.1,
-                thinking_config: {
-                  thinking_budget: 0,
-                },
-              },
-            }),
-          }
-        );
+              }),
+            }
+          );
 
-        if (geminiRes.ok) {
-          const geminiJson = await geminiRes.json();
-          const responseText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (responseText) {
-            const parsed = JSON.parse(responseText);
-            return NextResponse.json({
-              success: true,
-              source: "ai-fallback",
-              results: [
-                {
-                  name: parsed.name || searchQuery,
-                  calories: parsed.calories || 150,
-                  protein: parsed.protein || 2,
-                  carbs: parsed.carbs || 25,
-                  fat: parsed.fat || 3,
-                  emoji: parsed.emoji || "🍛",
-                  source: "✨ Gemini AI Smart Estimate",
-                },
-              ],
-            });
+          if (geminiRes.ok) {
+            const geminiJson = await geminiRes.json();
+            const text = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              const parsed = JSON.parse(text);
+              return NextResponse.json({
+                success: true,
+                source: "gemini-ai",
+                results: [parsed],
+              });
+            }
           }
+        } catch (mErr) {
+          // try next model
         }
-      } catch (aiErr) {
-        console.error("AI Fallback Search Error:", aiErr);
       }
     }
 

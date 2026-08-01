@@ -71,17 +71,17 @@ export async function POST(req: Request) {
         const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
         const mimeType = image.match(/^data:(image\/\w+);base64,/)?.[1] || "image/jpeg";
 
-        // Prioritize ultra-fast non-reasoning flash models
+        // Prioritize official ultra-fast Gemini Flash vision models
         const geminiModels = [
-          "gemini-2.0-flash-lite",
+          "gemini-2.5-flash",
+          "gemini-2.0-flash",
           "gemini-1.5-flash",
-          "gemini-3.5-flash",
         ];
 
         for (const modelName of geminiModels) {
           try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s per model cap
+            const timeoutId = setTimeout(() => controller.abort(), 4000); // 4.0s per model cap
 
             const geminiRes = await fetch(
               `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`,
@@ -119,9 +119,6 @@ Return raw JSON ONLY:
                   generationConfig: {
                     response_mime_type: "application/json",
                     temperature: 0.1,
-                    thinking_config: {
-                      thinking_budget: 0,
-                    },
                   },
                 }),
               }
