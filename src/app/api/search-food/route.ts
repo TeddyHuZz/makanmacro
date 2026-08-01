@@ -72,7 +72,7 @@ export async function POST(req: Request) {
     // 2. STEP 2: SMART AI FALLBACK ONLY WHEN DB IS EMPTY
     const geminiKey = process.env.GEMINI_API_KEY?.trim();
     if (geminiKey && geminiKey.length > 5) {
-      const geminiModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
+      const geminiModels = ["gemini-3.1-flash-lite", "gemini-3.6-flash", "gemini-3-flash"];
       for (const modelName of geminiModels) {
         try {
           const geminiRes = await fetch(

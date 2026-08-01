@@ -71,11 +71,11 @@ export async function POST(req: Request) {
         const base64Data = image.replace(/^data:image\/\w+;base64,/, "");
         const mimeType = image.match(/^data:(image\/\w+);base64,/)?.[1] || "image/jpeg";
 
-        // Prioritize official ultra-fast Gemini Flash vision models
+        // Active 2026 Google AI Studio models with generous free quotas
         const geminiModels = [
-          "gemini-2.5-flash",
-          "gemini-2.0-flash",
-          "gemini-1.5-flash",
+          "gemini-3.1-flash-lite",
+          "gemini-3.6-flash",
+          "gemini-3-flash",
         ];
 
         for (const modelName of geminiModels) {
@@ -126,11 +126,25 @@ Return raw JSON ONLY:
 
             clearTimeout(timeoutId);
 
-            if (geminiRes.status === 429) {
+            const geminiJson = await geminiRes.json();
+
+            if (!geminiRes.ok) {
+              console.error(`Gemini API Error (${geminiRes.status}):`, geminiJson);
+              if (geminiRes.status === 429) {
+                return NextResponse.json(
+                  { error: "Gemini AI API Key Quota Exceeded (429). Please update GEMINI_API_KEY in .env.local / Vercel with a fresh key from Google AI Studio." },
+                  { status: 429 }
+                );
+              }
+              if (geminiRes.status === 400 || geminiRes.status === 401) {
+                return NextResponse.json(
+                  { error: `Gemini API Key Error (${geminiRes.status}): ${geminiJson?.error?.message || "Invalid API key"}` },
+                  { status: geminiRes.status }
+                );
+              }
               continue;
             }
 
-            const geminiJson = await geminiRes.json();
             const responseText = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text;
             if (responseText) {
               const parsed = JSON.parse(responseText);
@@ -162,8 +176,7 @@ Return raw JSON ONLY:
       try {
         const groq = new Groq({ apiKey: groqKey });
         const visionModels = [
-          "llama-3.2-90b-vision-preview",
-          "llama-3.2-11b-vision-preview",
+          "qwen/qwen3.6-27b",
         ];
 
         for (const modelName of visionModels) {
@@ -198,8 +211,8 @@ Return raw JSON ONLY:
                 data: { ...parsed, source: "groq-vision", openFoodFacts: dbData || null },
               });
             }
-          } catch (mErr) {
-            // continue
+          } catch (mErr: any) {
+            console.error("Groq model error:", mErr?.message || mErr);
           }
         }
       } catch (err: any) {
