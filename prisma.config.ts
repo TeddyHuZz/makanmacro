@@ -1,12 +1,14 @@
 import { defineConfig } from "@prisma/config";
+import dotenv from "dotenv";
+import path from "path";
 
-const databaseUrl =
-  process.env.DATABASE_URL ||
-  "postgresql://neondb_owner:npg_NJ0YZQRX1dLj@ep-jolly-union-az6hqed2.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require";
+// Load environment variables from .env.local safely
+dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
+dotenv.config();
 
 export default defineConfig({
   schema: "./prisma/schema.prisma",
   datasource: {
-    url: databaseUrl,
+    url: process.env.DATABASE_URL || "",
   },
 });
