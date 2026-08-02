@@ -142,39 +142,93 @@ export default function DashboardPage() {
     }
 
     try {
-      // Load user plan
+      // 1. Instant load from local storage for fast render
       const savedPlanStr = localStorage.getItem("makanmacro_user_plan");
+      let localPlan: any = null;
       if (savedPlanStr) {
-        const plan = JSON.parse(savedPlanStr);
-        if (plan.targetCalories) setTargetCalories(plan.targetCalories);
-        if (plan.proteinGrams) setProteinTarget(plan.proteinGrams);
-        if (plan.carbsGrams) setCarbsTarget(plan.carbsGrams);
-        if (plan.fatGrams) setFatTarget(plan.fatGrams);
-        if (plan.weight) setCurrentWeight(plan.weight);
+        localPlan = JSON.parse(savedPlanStr);
+        if (localPlan.targetCalories) setTargetCalories(localPlan.targetCalories);
+        if (localPlan.proteinGrams) setProteinTarget(localPlan.proteinGrams);
+        if (localPlan.carbsGrams) setCarbsTarget(localPlan.carbsGrams);
+        if (localPlan.fatGrams) setFatTarget(localPlan.fatGrams);
+        if (localPlan.weight) setCurrentWeight(localPlan.weight);
       } else {
         router.push("/onboarding");
       }
 
-      // Load saved meals from local storage
       const savedMealsStr = localStorage.getItem("makanmacro_meals");
+      let localMeals: MealLog[] = [];
       if (savedMealsStr) {
-        setMeals(JSON.parse(savedMealsStr));
+        localMeals = JSON.parse(savedMealsStr);
+        setMeals(localMeals);
       }
 
-      // Load scale weight logs
       const savedWeightStr = localStorage.getItem("makanmacro_weight_logs");
+      let localWeights: any[] = [];
       if (savedWeightStr) {
-        const logs = JSON.parse(savedWeightStr);
-        if (logs.length > 0) {
-          setCurrentWeight(logs[logs.length - 1].weight);
+        localWeights = JSON.parse(savedWeightStr);
+        if (localWeights.length > 0) {
+          setCurrentWeight(localWeights[localWeights.length - 1].weight);
         }
       }
+
+      // 2. Background sync & fetch from Neon DB
+      (async () => {
+        try {
+          const [planRes, mealsRes, weightsRes] = await Promise.all([
+            fetch("/api/plan").then((r) => r.json()).catch(() => null),
+            fetch("/api/meals").then((r) => r.json()).catch(() => null),
+            fetch("/api/weights").then((r) => r.json()).catch(() => null),
+          ]);
+
+          if (planRes?.success && planRes.plan) {
+            const p = planRes.plan;
+            setTargetCalories(p.targetCalories);
+            setProteinTarget(p.proteinGrams);
+            setCarbsTarget(p.carbsGrams);
+            setFatTarget(p.fatGrams);
+            if (p.weightKg) setCurrentWeight(p.weightKg);
+            localStorage.setItem("makanmacro_user_plan", JSON.stringify(p));
+          } else if (localPlan) {
+            fetch("/api/plan", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(localPlan),
+            });
+          }
+
+          if (mealsRes?.success && Array.isArray(mealsRes.meals)) {
+            setMeals(mealsRes.meals);
+            localStorage.setItem("makanmacro_meals", JSON.stringify(mealsRes.meals));
+          } else if (localMeals.length > 0) {
+            fetch("/api/meals", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ meals: localMeals }),
+            });
+          }
+
+          if (weightsRes?.success && Array.isArray(weightsRes.weights) && weightsRes.weights.length > 0) {
+            const wLogs = weightsRes.weights;
+            setCurrentWeight(wLogs[wLogs.length - 1].weight);
+            localStorage.setItem("makanmacro_weight_logs", JSON.stringify(wLogs));
+          } else if (localWeights.length > 0) {
+            fetch("/api/weights", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ weights: localWeights }),
+            });
+          }
+        } catch (err) {
+          console.error("Neon DB sync error", err);
+        }
+      })();
     } catch (e) {
       console.error("Failed to parse saved data", e);
     }
   }, [status, router]);
 
-  // Save meals to local storage whenever updated
+  // Save meals to local storage & Neon DB whenever updated
   const saveMealsToStorage = (updatedMeals: MealLog[]) => {
     setMeals(updatedMeals);
     try {
@@ -781,34 +835,55 @@ export default function DashboardPage() {
                       logs.push({ date: new Date().toISOString(), weight: val });
                       localStorage.setItem("makanmacro_weight_logs", JSON.stringify(logs));
 
-                      // Automatically Recalculate TDEE & Update Daily Calorie Target
-                      if (logs.length >= 2) {
-                        const first = logs[0].weight;
-                        const last = logs[logs.length - 1].weight;
-                        const deltaKg = last - first;
-                        const avgIntake = totalCalories > 0 ? totalCalories : targetCalories;
-                        const calculatedTDEE = Math.round(avgIntake - (deltaKg * 7700 / Math.max(1, logs.length)));
-                        
-                        if (calculatedTDEE >= 1200 && calculatedTDEE <= 4500) {
-                          const newCalTarget = Math.max(1200, calculatedTDEE - 350);
-                          const newProtein = Math.round((newCalTarget * 0.3) / 4);
-                          const newCarbs = Math.round((newCalTarget * 0.45) / 4);
-                          const newFat = Math.round((newCalTarget * 0.25) / 9);
+                      // Automatically Recalculate TDEE & Update Daily Calorie & Macro Target for new weight
+                      const savedPlanStr = localStorage.getItem("makanmacro_user_plan");
+                      let basePlan = savedPlanStr ? JSON.parse(savedPlanStr) : {};
+                      
+                      const gender = basePlan.gender || "female";
+                      const heightCm = basePlan.heightCm || 160;
+                      const age = basePlan.age || 25;
+                      const activity = basePlan.activity || "moderate";
+                      const goal = basePlan.goal || "lose";
 
-                          setTargetCalories(newCalTarget);
-                          setProteinTarget(newProtein);
-                          setCarbsTarget(newCarbs);
-                          setFatTarget(newFat);
+                      let bmr = 10 * val + 6.25 * heightCm - 5 * age;
+                      bmr = gender === "male" ? bmr + 5 : bmr - 161;
 
-                          const updatedPlan = {
-                            targetCalories: newCalTarget,
-                            proteinGrams: newProtein,
-                            carbsGrams: newCarbs,
-                            fatGrams: newFat,
-                          };
-                          localStorage.setItem("makanmacro_user_plan", JSON.stringify(updatedPlan));
-                        }
-                      }
+                      const activityMultipliers: Record<string, number> = {
+                        sedentary: 1.2,
+                        light: 1.375,
+                        moderate: 1.55,
+                        active: 1.725,
+                      };
+
+                      const tdee = Math.round(bmr * (activityMultipliers[activity] || 1.55));
+                      let newCalTarget = tdee;
+                      if (goal === "lose") newCalTarget = Math.round(tdee - 500);
+                      if (goal === "gain") newCalTarget = Math.round(tdee + 300);
+                      newCalTarget = Math.max(1200, newCalTarget);
+
+                      const newProtein = Math.round(val * 2.0);
+                      const newFat = Math.round((newCalTarget * 0.25) / 9);
+                      const proteinCals = newProtein * 4;
+                      const fatCals = newFat * 9;
+                      const newCarbs = Math.max(50, Math.round((newCalTarget - proteinCals - fatCals) / 4));
+
+                      setTargetCalories(newCalTarget);
+                      setProteinTarget(newProtein);
+                      setCarbsTarget(newCarbs);
+                      setFatTarget(newFat);
+
+                      const updatedPlan = {
+                        ...basePlan,
+                        weight: val,
+                        weightKg: val,
+                        bmr: Math.round(bmr),
+                        tdee,
+                        targetCalories: newCalTarget,
+                        proteinGrams: newProtein,
+                        carbsGrams: newCarbs,
+                        fatGrams: newFat,
+                      };
+                      localStorage.setItem("makanmacro_user_plan", JSON.stringify(updatedPlan));
                     } catch (e) {
                       console.error(e);
                     }

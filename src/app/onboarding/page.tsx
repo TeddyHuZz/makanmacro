@@ -154,7 +154,7 @@ export default function OnboardingPage() {
     setStep((prev) => Math.max(1, prev - 1));
   };
 
-  const handleFinishOnboarding = () => {
+  const handleFinishOnboarding = async () => {
     if (calculatedPlan) {
       const userWeight = parseFloat(weightInput) || 70;
       const userPlanData = {
@@ -174,6 +174,19 @@ export default function OnboardingPage() {
         const logs = JSON.parse(logsStr);
         logs.push({ date: new Date().toISOString(), weight: userWeight });
         localStorage.setItem("makanmacro_weight_logs", JSON.stringify(logs));
+
+        // Sync to Neon DB backend
+        await fetch("/api/plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(userPlanData),
+        }).catch((err) => console.error("Neon DB plan sync error:", err));
+
+        await fetch("/api/weights", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ weight: userWeight }),
+        }).catch((err) => console.error("Neon DB weight sync error:", err));
       } catch (e) {
         console.error("Failed to save plan to localStorage", e);
       }

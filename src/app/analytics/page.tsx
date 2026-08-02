@@ -30,6 +30,8 @@ interface MealLog {
   fat: number;
   emoji: string;
   imageUrl?: string;
+  createdAt?: string;
+  date?: string;
 }
 
 export default function AnalyticsPage() {
@@ -55,7 +57,7 @@ export default function AnalyticsPage() {
     }
 
     try {
-      // Load user plan
+      // Instant load from localStorage
       const savedPlanStr = localStorage.getItem("makanmacro_user_plan");
       if (savedPlanStr) {
         const plan = JSON.parse(savedPlanStr);
@@ -65,13 +67,11 @@ export default function AnalyticsPage() {
         if (plan.fatGrams) setFatTarget(plan.fatGrams);
       }
 
-      // Load meals
       const savedMealsStr = localStorage.getItem("makanmacro_meals");
       if (savedMealsStr) {
         setMeals(JSON.parse(savedMealsStr));
       }
 
-      // Load current weight
       const logsStr = localStorage.getItem("makanmacro_weight_logs");
       if (logsStr) {
         const logs = JSON.parse(logsStr);
@@ -80,11 +80,39 @@ export default function AnalyticsPage() {
         }
       }
 
-      // Load last check-in date
       const savedCheckIn = localStorage.getItem("makanmacro_last_checkin");
       if (savedCheckIn) {
         setLastCheckIn(savedCheckIn);
       }
+
+      // Background fetch from Neon DB
+      (async () => {
+        try {
+          const [planRes, mealsRes, weightsRes] = await Promise.all([
+            fetch("/api/plan").then((r) => r.json()).catch(() => null),
+            fetch("/api/meals").then((r) => r.json()).catch(() => null),
+            fetch("/api/weights").then((r) => r.json()).catch(() => null),
+          ]);
+
+          if (planRes?.success && planRes.plan) {
+            const p = planRes.plan;
+            setTargetCalories(p.targetCalories);
+            setProteinTarget(p.proteinGrams);
+            setCarbsTarget(p.carbsGrams);
+            setFatTarget(p.fatGrams);
+          }
+
+          if (mealsRes?.success && Array.isArray(mealsRes.meals)) {
+            setMeals(mealsRes.meals);
+          }
+
+          if (weightsRes?.success && Array.isArray(weightsRes.weights) && weightsRes.weights.length > 0) {
+            setCurrentWeight(weightsRes.weights[weightsRes.weights.length - 1].weight);
+          }
+        } catch (err) {
+          console.error("Neon DB sync error", err);
+        }
+      })();
     } catch (e) {
       console.error("Failed to load analytics data", e);
     }
@@ -131,32 +159,60 @@ export default function AnalyticsPage() {
     );
   }
 
-  // Calculate totals
-  const totalCalories = meals.reduce((acc, m) => acc + m.calories, 0);
-  const totalProtein = meals.reduce((acc, m) => acc + m.protein, 0);
-  const totalCarbs = meals.reduce((acc, m) => acc + m.carbs, 0);
-  const totalFat = meals.reduce((acc, m) => acc + m.fat, 0);
+  // Helper to extract Date object from a MealLog
+  const getMealDate = (meal: MealLog): Date => {
+    if (meal.createdAt) return new Date(meal.createdAt);
+    if (meal.date) return new Date(meal.date);
+    if (meal.id && !isNaN(Number(meal.id))) return new Date(Number(meal.id));
+    return new Date();
+  };
 
-  // Highest protein meal
-  const topProteinMeal = meals.length > 0
+  const isSameDay = (d1: Date, d2: Date) => {
+    return (
+      d1.getDate() === d2.getDate() &&
+      d1.getMonth() === d2.getMonth() &&
+      d1.getFullYear() === d2.getFullYear()
+    );
+  };
+
+  // Filter today's meals
+  const today = new Date();
+  const todayMeals = meals.filter((m) => isSameDay(getMealDate(m), today));
+
+  // Today's total intake
+  const todayCalories = todayMeals.reduce((acc, m) => acc + m.calories, 0);
+  const todayProtein = todayMeals.reduce((acc, m) => acc + m.protein, 0);
+  const todayCarbs = todayMeals.reduce((acc, m) => acc + m.carbs, 0);
+  const todayFat = todayMeals.reduce((acc, m) => acc + m.fat, 0);
+
+  // Highest protein meal (prefer today's meals, fallback to all-time if today has none)
+  const topProteinMeal = todayMeals.length > 0
+    ? [...todayMeals].sort((a, b) => b.protein - a.protein)[0]
+    : meals.length > 0
     ? [...meals].sort((a, b) => b.protein - a.protein)[0]
     : null;
 
-  // Mock 7-day data (current day populated with live total)
+  // Real 7-day data (current week Monday to Sunday)
   const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const currentDayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+  const currentDayOfWeek = today.getDay(); // 0 is Sun, 1 is Mon...
+  const daysFromMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - daysFromMonday);
+  monday.setHours(0, 0, 0, 0);
 
   const weeklyData = daysOfWeek.map((day, idx) => {
-    if (idx === currentDayIndex) {
-      return { day, calories: totalCalories, isToday: true };
-    }
-    const mockVals = [1850, 1920, 2050, 1780, 1980, 2100, 1890];
-    return { day, calories: mockVals[idx], isToday: false };
+    const dayDate = new Date(monday);
+    dayDate.setDate(monday.getDate() + idx);
+    const dayMeals = meals.filter((m) => isSameDay(getMealDate(m), dayDate));
+    const dayCalories = dayMeals.reduce((acc, m) => acc + m.calories, 0);
+    const isToday = isSameDay(dayDate, today);
+
+    return { day, calories: dayCalories, isToday };
   });
 
-  const adherenceScore = totalCalories > 0
-    ? Math.max(70, Math.min(99, Math.round(100 - Math.abs(totalCalories - targetCalories) / 50)))
-    : 94;
+  const adherenceScore = todayCalories > 0
+    ? Math.max(70, Math.min(99, Math.round(100 - Math.abs(todayCalories - targetCalories) / 50)))
+    : (meals.length > 0 ? 94 : 100);
 
   // Dynamic MacroFactor TDEE Expenditure Calculation
   const estimatedExpenditure = (() => {
@@ -168,7 +224,7 @@ export default function AnalyticsPage() {
         const first = weightLogs[0].weight;
         const last = weightLogs[weightLogs.length - 1].weight;
         const deltaKg = last - first;
-        const avgDailyIntake = totalCalories > 0 ? totalCalories : targetCalories;
+        const avgDailyIntake = todayCalories > 0 ? todayCalories : targetCalories;
         const calculatedTDEE = Math.round(avgDailyIntake - (deltaKg * 7700 / Math.max(1, weightLogs.length)));
         if (calculatedTDEE >= 1200 && calculatedTDEE <= 4500) {
           return calculatedTDEE;
@@ -292,17 +348,17 @@ export default function AnalyticsPage() {
                 <span>Protein Ratio</span>
               </span>
               <span className="font-bold text-emerald-400">
-                {Math.round((totalProtein / (proteinTarget || 1)) * 100)}%
+                {Math.round((todayProtein / (proteinTarget || 1)) * 100)}%
               </span>
             </div>
             <div className="h-2 w-full rounded-full bg-zinc-950 border border-zinc-800 overflow-hidden">
               <div
-                style={{ width: `${Math.min(100, (totalProtein / (proteinTarget || 1)) * 100)}%` }}
+                style={{ width: `${Math.min(100, (todayProtein / (proteinTarget || 1)) * 100)}%` }}
                 className="h-full bg-emerald-500 rounded-full transition-all duration-500"
               />
             </div>
             <div className="flex items-center justify-between text-[11px] text-zinc-500">
-              <span>Intake: {totalProtein}g</span>
+              <span>Intake: {todayProtein}g</span>
               <span>Goal: {proteinTarget}g</span>
             </div>
           </div>
@@ -315,17 +371,17 @@ export default function AnalyticsPage() {
                 <span>Carbs Ratio</span>
               </span>
               <span className="font-bold text-amber-400">
-                {Math.round((totalCarbs / (carbsTarget || 1)) * 100)}%
+                {Math.round((todayCarbs / (carbsTarget || 1)) * 100)}%
               </span>
             </div>
             <div className="h-2 w-full rounded-full bg-zinc-950 border border-zinc-800 overflow-hidden">
               <div
-                style={{ width: `${Math.min(100, (totalCarbs / (carbsTarget || 1)) * 100)}%` }}
+                style={{ width: `${Math.min(100, (todayCarbs / (carbsTarget || 1)) * 100)}%` }}
                 className="h-full bg-amber-500 rounded-full transition-all duration-500"
               />
             </div>
             <div className="flex items-center justify-between text-[11px] text-zinc-500">
-              <span>Intake: {totalCarbs}g</span>
+              <span>Intake: {todayCarbs}g</span>
               <span>Goal: {carbsTarget}g</span>
             </div>
           </div>
@@ -338,17 +394,17 @@ export default function AnalyticsPage() {
                 <span>Fat Ratio</span>
               </span>
               <span className="font-bold text-sky-400">
-                {Math.round((totalFat / (fatTarget || 1)) * 100)}%
+                {Math.round((todayFat / (fatTarget || 1)) * 100)}%
               </span>
             </div>
             <div className="h-2 w-full rounded-full bg-zinc-950 border border-zinc-800 overflow-hidden">
               <div
-                style={{ width: `${Math.min(100, (totalFat / (fatTarget || 1)) * 100)}%` }}
+                style={{ width: `${Math.min(100, (todayFat / (fatTarget || 1)) * 100)}%` }}
                 className="h-full bg-sky-500 rounded-full transition-all duration-500"
               />
             </div>
             <div className="flex items-center justify-between text-[11px] text-zinc-500">
-              <span>Intake: {totalFat}g</span>
+              <span>Intake: {todayFat}g</span>
               <span>Goal: {fatTarget}g</span>
             </div>
           </div>
@@ -380,7 +436,11 @@ export default function AnalyticsPage() {
               <div>
                 <p className="text-[10px] text-zinc-400">Average Meal Size</p>
                 <p className="text-xs font-bold text-white">
-                  {meals.length > 0 ? `${Math.round(totalCalories / meals.length)} kcal / meal` : "0 kcal"}
+                  {todayMeals.length > 0
+                    ? `${Math.round(todayCalories / todayMeals.length)} kcal / meal`
+                    : meals.length > 0
+                    ? `${Math.round(meals.reduce((a, m) => a + m.calories, 0) / meals.length)} kcal / meal`
+                    : "0 kcal"}
                 </p>
               </div>
             </div>

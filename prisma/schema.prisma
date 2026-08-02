@@ -1,0 +1,69 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String      @id @default(cuid())
+  name          String?
+  email         String?     @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  userPlan      UserPlan?
+  mealLogs      MealLog[]
+  weightLogs    WeightLog[]
+}
+
+model UserPlan {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weightKg       Float
+  heightCm       Float
+  age            Int
+  gender         String   // "male" | "female"
+  activity       String   // "sedentary" | "light" | "moderate" | "active"
+  goal           String   // "lose" | "maintain" | "gain"
+  bmr            Int
+  tdee           Int
+  targetCalories Int
+  proteinGrams   Int
+  carbsGrams     Int
+  fatGrams       Int
+  completedAt    DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model MealLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  time      String
+  type      String
+  calories  Int
+  protein   Int
+  carbs     Int
+  fat       Int
+  emoji     String
+  imageUrl  String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model WeightLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weight    Float
+  date      DateTime @default(now())
+
+  @@index([userId, date])
+}

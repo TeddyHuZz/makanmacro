@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "@types/pg": "^8.20.3",
     "@zxing/library": "^0.23.0",
     "bcryptjs": "^3.0.3",
     "dexie": "^4.4.4",
@@ -19,6 +22,8 @@
     "lucide-react": "^1.28.0",
     "next": "16.2.12",
     "next-auth": "^5.0.0-beta.32",
+    "pg": "^8.22.0",
+    "prisma": "^7.9.1",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
