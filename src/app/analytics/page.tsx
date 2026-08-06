@@ -104,6 +104,7 @@ export default function AnalyticsPage() {
 
           if (mealsRes?.success && Array.isArray(mealsRes.meals)) {
             setMeals(mealsRes.meals);
+            localStorage.setItem("makanmacro_meals", JSON.stringify(mealsRes.meals));
           }
 
           if (weightsRes?.success && Array.isArray(weightsRes.weights) && weightsRes.weights.length > 0) {

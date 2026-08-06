@@ -198,14 +198,24 @@ export default function DashboardPage() {
           }
 
           if (mealsRes?.success && Array.isArray(mealsRes.meals)) {
-            setMeals(mealsRes.meals);
-            localStorage.setItem("makanmacro_meals", JSON.stringify(mealsRes.meals));
-          } else if (localMeals.length > 0) {
-            fetch("/api/meals", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ meals: localMeals }),
-            });
+            if (mealsRes.meals.length > 0) {
+              setMeals(mealsRes.meals);
+              localStorage.setItem("makanmacro_meals", JSON.stringify(mealsRes.meals));
+            } else if (localMeals.length > 0) {
+              const postRes = await fetch("/api/meals", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ meals: localMeals }),
+              }).then((r) => r.json()).catch(() => null);
+
+              if (postRes?.success && Array.isArray(postRes.meals)) {
+                setMeals(postRes.meals);
+                localStorage.setItem("makanmacro_meals", JSON.stringify(postRes.meals));
+              }
+            } else {
+              setMeals([]);
+              localStorage.setItem("makanmacro_meals", "[]");
+            }
           }
 
           if (weightsRes?.success && Array.isArray(weightsRes.weights) && weightsRes.weights.length > 0) {
@@ -235,6 +245,82 @@ export default function DashboardPage() {
       localStorage.setItem("makanmacro_meals", JSON.stringify(updatedMeals));
     } catch (e) {
       console.error("Failed to save meals", e);
+    }
+  };
+
+  const addMeal = async (newMeal: MealLog) => {
+    setMeals((prevMeals) => {
+      const updated = [newMeal, ...prevMeals];
+      try {
+        localStorage.setItem("makanmacro_meals", JSON.stringify(updated));
+      } catch (e) {
+        console.error("Failed to save meals to localStorage", e);
+      }
+      return updated;
+    });
+
+    try {
+      const res = await fetch("/api/meals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newMeal),
+      });
+      const data = await res.json();
+      if (data?.success && data.meal) {
+        setMeals((prevMeals) => {
+          const synced = prevMeals.map((m) =>
+            m.id === newMeal.id ? { ...m, id: data.meal.id } : m
+          );
+          try {
+            localStorage.setItem("makanmacro_meals", JSON.stringify(synced));
+          } catch (e) {
+            console.error("Failed to update localStorage", e);
+          }
+          return synced;
+        });
+      }
+    } catch (e) {
+      console.error("Failed to sync added meal to DB", e);
+    }
+  };
+
+  const handleDeleteMeal = async (id: string) => {
+    setMeals((prevMeals) => {
+      const updated = prevMeals.filter((m) => m.id !== id);
+      try {
+        localStorage.setItem("makanmacro_meals", JSON.stringify(updated));
+      } catch (e) {
+        console.error("Failed to update localStorage after delete", e);
+      }
+      return updated;
+    });
+
+    try {
+      await fetch(`/api/meals?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+    } catch (e) {
+      console.error("Failed to delete meal from DB", e);
+    }
+  };
+
+  const handleClearAllMeals = async () => {
+    setMeals((prevMeals) => {
+      const updated = prevMeals.filter((m) => !isMealLoggedToday(m));
+      try {
+        localStorage.setItem("makanmacro_meals", JSON.stringify(updated));
+      } catch (e) {
+        console.error("Failed to update localStorage after clear", e);
+      }
+      return updated;
+    });
+
+    try {
+      await fetch("/api/meals?clearToday=true", {
+        method: "DELETE",
+      });
+    } catch (e) {
+      console.error("Failed to clear today's meals in DB", e);
     }
   };
 
@@ -359,7 +445,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleConfirmAddMeal = () => {
+  const handleConfirmAddMeal = async () => {
     if (!analyzedResult) return;
 
     const mult = portionMultiplier * cookingStyleMultiplier;
@@ -379,20 +465,11 @@ export default function DashboardPage() {
       createdAt: new Date().toISOString(),
     };
 
-    saveMealsToStorage([...meals, newMeal]);
+    await addMeal(newMeal);
     setSelectedImage(null);
     setAnalyzedResult(null);
     setPortionMultiplier(1.0);
     setCookingStyleMultiplier(1.0);
-  };
-
-  const handleDeleteMeal = (id: string) => {
-    saveMealsToStorage(meals.filter((m) => m.id !== id));
-  };
-
-  const handleClearAllMeals = () => {
-    // Clear only today's meals while preserving historical log data for Analytics
-    saveMealsToStorage(meals.filter((m) => !isMealLoggedToday(m)));
   };
 
   return (
@@ -962,7 +1039,7 @@ export default function DashboardPage() {
                             emoji: item.emoji || "🥛",
                             createdAt: new Date().toISOString(),
                           };
-                          saveMealsToStorage([...meals, newMeal]);
+                          addMeal(newMeal);
                           setIsQuickSearchOpen(false);
                           setQuickQuery("");
                           setSearchResults([]);
@@ -1017,7 +1094,7 @@ export default function DashboardPage() {
                           emoji: item.emoji,
                           createdAt: new Date().toISOString(),
                         };
-                        saveMealsToStorage([...meals, newMeal]);
+                        addMeal(newMeal);
                         setIsQuickSearchOpen(false);
                         setQuickQuery("");
                         setSearchResults([]);
@@ -1094,7 +1171,7 @@ export default function DashboardPage() {
                       emoji: "📝",
                       createdAt: new Date().toISOString(),
                     };
-                    saveMealsToStorage([...meals, newMeal]);
+                    addMeal(newMeal);
                     setIsQuickSearchOpen(false);
                     setCustomName("");
                     setCustomCals("");
